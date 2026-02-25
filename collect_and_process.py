@@ -122,8 +122,8 @@ def _get_detail_info(kapt_code):
     return None
 
 
-def collect_all_info(apt_code_file):
-    """아파트 코드 파일에서 모든 단지의 기본/상세 정보를 수집합니다."""
+def collect_all_info(apt_code_file, max_items=10000):
+    """아파트 코드 파일에서 모든 단지의 기본/상세 정보를 수집합니다. (일일 API 제한 고려)"""
     df = pd.read_csv(apt_code_file)
     if 'kaptCode' not in df.columns:
         print("kaptCode 컬럼을 찾을 수 없습니다.")
@@ -165,12 +165,16 @@ def collect_all_info(apt_code_file):
         print("모든 코드가 이미 처리 완료.")
         return basic_file, detail_file
 
-    print(f"남은 수집 대상: {len(codes_to_process)}개")
+    print(f"남은 수집 대상: {len(codes_to_process)}개 (이번 실행에서는 최대 {max_items}개만 수집)")
     count = 0
-    total = len(codes_to_process)
+    total = min(len(codes_to_process), max_items)
 
     try:
         for code in codes_to_process:
+            if count >= max_items:
+                print(f"\\n[제한 도달] 설정된 최대 수집 건수({max_items}건)에 도달하여 수집을 일시 중지합니다.")
+                break
+                
             count += 1
             if count % 10 == 0 or total <= 100:
                 print(f"정보 수집 {count}/{total}...")
@@ -766,7 +770,7 @@ def process_trade_rent(trade_file, rent_file=None):
 # 메인 실행
 # ==============================================================================
 
-def main(regions, months_back, skip_code=False, skip_basic=False, skip_trade=False):
+def main(regions, months_back, skip_code=False, skip_basic=False, skip_trade=False, max_basic=10000):
     """전체 수집 및 가공 파이프라인을 실행합니다."""
     print("=" * 60)
     print(f"아파트 데이터 수집 및 가공 시작")
@@ -793,7 +797,7 @@ def main(regions, months_back, skip_code=False, skip_basic=False, skip_trade=Fal
     # Step 2: 기본/상세 정보 수집
     if not skip_basic:
         print("\n[Step 2/4] 기본/상세 정보 수집")
-        res = collect_all_info(code_file)
+        res = collect_all_info(code_file, max_items=max_basic)
         if res and len(res) == 2:
             basic_info_file, detail_info_file = res
     else:
@@ -829,6 +833,8 @@ if __name__ == "__main__":
     parser.add_argument('--skip-code', action='store_true', help='단지 코드 수집 건너뛰기')
     parser.add_argument('--skip-basic', action='store_true', help='기본/상세 정보(K-Apt) 수집 건너뛰기')
     parser.add_argument('--skip-trade', action='store_true', help='매매/전월세 수집 건너뛰기')
+    parser.add_argument('--max-basic', type=int, default=10000, 
+                        help='하루 최대 기본/상세 정보 수집 건수 제한 (기본값: 10000)')
     
     args = parser.parse_args()
-    main(args.regions, args.months, args.skip_code, args.skip_basic, args.skip_trade)
+    main(args.regions, args.months, args.skip_code, args.skip_basic, args.skip_trade, args.max_basic)
