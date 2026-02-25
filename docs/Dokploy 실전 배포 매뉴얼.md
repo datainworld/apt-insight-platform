@@ -80,11 +80,12 @@
    # 접속 후 프롬프트가 root@<컨테이너ID>:/app# 로 변경됨
    ```
 
-4. **(핵심 트러블슈팅)** 우분투 OS의 시스템 파이썬(`python3`)에 패키지를 강제로 모두 설치 시킵니다. (`--break-system-packages` 옵션 사용)
+4. **(핵심 트러블슈팅 - 가짜 파이썬 회피)** 우분투 OS의 시스템 파이썬(`python3`)에 패키지를 강제로 모두 설치 시킵니다. (`--break-system-packages` 옵션 사용)
+   이때 Dokploy의 임의 파이썬 환경(`/root/.nix-profile/bin/python3`)이 실행을 가로채어 pip 오류가 발생하지 않도록, **반드시 `/usr/bin/python3` 절대 경로를 명시**하여 설치해야 합니다.
    ```bash
    apt-get update
    apt-get install -y python3-pip libstdc++6 gcc make g++
-   python3 -m pip install pandas requests xmltodict python-dotenv sqlalchemy psycopg2-binary python-dateutil curl-cffi --break-system-packages
+   /usr/bin/python3 -m pip install pandas requests xmltodict python-dotenv sqlalchemy psycopg2-binary python-dateutil curl-cffi --break-system-packages
    ```
 5. 완벽하게 준비된 `/usr/bin/python3` 절대 경로를 명시하여 백그라운드 수집을 시작합니다. (약 8~12시간 소요)
    ```bash
@@ -116,17 +117,31 @@
 ---
 
 ## 6. 일일 작동 설정 (Dokploy 스케줄러 등록)
-초기 거대한 데이터 수집이 끝난 뒤, 매일매일 자동으로 어제까지의 데이터를 증분 업데이트하고 DB에 밀어 넣으려면 **Dokploy 대시보드의 Cron Jobs**를 활용합니다. (서버에서 crontab을 칠 필요가 없습니다!)
+초기 거대한 데이터 수집이 끝난 뒤 매일매일 자동으로 데이터를 업데이트하거나, 특정 시간에 수집을 예약하려면 **Dokploy 대시보드의 Scheduled Jobs**를 활용합니다. (서버에서 crontab을 칠 필요가 없습니다!)
 
-1. Dokploy 대시보드 - 좌측 메뉴 중 **Scheduled Jobs**로 이동합니다. (버전에 따라 해당 Application 요약화면의 Jobs 탭에 있을 수 있습니다.)
-2. **실거래가 매일 업데이트 Job 생성**
+### 📝 스케줄러 생성 화면 (Create Schedule) 작성 가이드
+1. Dokploy 대시보드 좌측 메뉴에서 **Scheduled Jobs** (또는 Application 요약 화면의 Jobs 탭)로 이동하여 **Add Job(또는 Create Schedule)**을 클릭합니다.
+2. 아래 항목들을 목적에 맞게 작성합니다.
+   * **Task Name:** 작업 이름 (예: `Daily_Apt_Update`, `Initial_Data_Collection` 등)
+   * **Schedule:** `Custom cron expression` 선택 후 크론식 입력 (예: `0 2 * * *` = 매일 새벽 2시)
+   * **Timezone:** `Asia/Seoul` 선택 (중요! 없으면 UTC 기준으로 시간 계산 필요)
+   * **Shell Type:** `Bash` 유지
+   * **Command:** `/usr/bin/python3 /app/실행할_파이썬_파일.py [옵션]`
+   * **Enabled:** 스위치 켬 (활성화 유지)
+
+### 📌 추천 자동화 스케줄 예시
+1. **실거래가 매일 업데이트 (증분 수집/DB 적재)**
    - **Name:** Daily_Apt_Update
    - **Cron Expression:** `0 2 * * *` (매일 새벽 2시)
    - **Command:** `/usr/bin/python3 /app/update_and_migrate.py`
-3. **네이버 부동산 매일 수집 Job 생성**
+2. **네이버 부동산 매물 매일 수집**
    - **Name:** Daily_Naver_Update
    - **Cron Expression:** `0 4 * * *` (매일 새벽 4시)
    - **Command:** `/usr/bin/python3 /app/collect_naver_listing.py`
+3. **(참고) 1회성 데이터 최초 수집 예약 세팅 시 (예: 2월 26일 새벽 1시)**
+   - **Name:** Initial_Apt_Collect
+   - **Cron Expression:** `0 1 26 2 *` 
+   - **Command:** `/usr/bin/python3 /app/collect_and_process.py --regions 11 28 41 --months 36`
 
 ✅ **완료!** 
 이제 GitHub에 코드를 푸시하면 새로운 수집 스크립트가 배포되며, 볼륨 마운트를 통해 데이터 유실 없이 매일 설정된 시간에 안전하게 자동 수집 시스템이 돌아가는 최적의 아키텍처가 완성되었습니다.
