@@ -1088,7 +1088,7 @@ def generate_report(update_results, db_results, deleted_files):
 # 메인 실행
 # ==============================================================================
 
-def main(skip_db=False, skip_cleanup=False):
+def main(skip_db=False, skip_cleanup=False, skip_update=False):
     """전체 파이프라인: 일일 업데이트 → DB 마이그레이션 → 정리 → 보고서"""
     print("=" * 60)
     print("  일일 데이터 업데이트 및 DB 마이그레이션")
@@ -1096,23 +1096,26 @@ def main(skip_db=False, skip_cleanup=False):
 
     update_results = {}
 
-    # Step 1: 코드 업데이트
-    new_codes = step_1_update_codes()
+    if not skip_update:
+        # Step 1: 코드 업데이트
+        new_codes = step_1_update_codes()
 
-    # Step 2: 정보 업데이트
-    b_count, d_count = step_2_update_info(new_codes)
-    update_results['basic_count'] = b_count
-    update_results['detail_count'] = d_count
+        # Step 2: 정보 업데이트
+        b_count, d_count = step_2_update_info(new_codes)
+        update_results['basic_count'] = b_count
+        update_results['detail_count'] = d_count
 
-    # Step 3: 매매/전월세 업데이트
-    t_count, r_count, raw_trades, raw_rents = step_3_update_trade_rent()
-    update_results['trade_count'] = t_count
-    update_results['rent_count'] = r_count
+        # Step 3: 매매/전월세 업데이트
+        t_count, r_count, raw_trades, raw_rents = step_3_update_trade_rent()
+        update_results['trade_count'] = t_count
+        update_results['rent_count'] = r_count
 
-    # Step 3b: 거래 데이터에서 신규 apt_id 감지 → 기본 정보 마스터에 추가
-    new_basic_count = step_3b_update_basic_from_trades(raw_trades, raw_rents)
-    update_results['new_basic_from_trades'] = new_basic_count
-    update_results['basic_count'] = update_results.get('basic_count', 0) + new_basic_count
+        # Step 3b: 거래 데이터에서 신규 apt_id 감지 → 기본 정보 마스터에 추가
+        new_basic_count = step_3b_update_basic_from_trades(raw_trades, raw_rents)
+        update_results['new_basic_from_trades'] = new_basic_count
+        update_results['basic_count'] = update_results.get('basic_count', 0) + new_basic_count
+    else:
+        print(">>> 신규 데이터 수집 및 업데이트 건너뛰기")
 
     # Step 4: DB 마이그레이션
     db_results = {}
@@ -1136,7 +1139,8 @@ def main(skip_db=False, skip_cleanup=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="데이터 업데이트 및 DB 마이그레이션")
+    parser.add_argument('--skip-update', action='store_true', help='데이터 업데이트(수집/병합) 건너뛰기')
     parser.add_argument('--skip-db', action='store_true', help='DB 마이그레이션 건너뛰기')
     parser.add_argument('--skip-cleanup', action='store_true', help='파일 정리 건너뛰기')
     args = parser.parse_args()
-    main(skip_db=args.skip_db, skip_cleanup=args.skip_cleanup)
+    main(skip_db=args.skip_db, skip_cleanup=args.skip_cleanup, skip_update=args.skip_update)
