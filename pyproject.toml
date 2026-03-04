@@ -1,16 +1,36 @@
 [project]
-name = "apt-data-collection-manipulation"
-version = "0.1.0"
-description = "서울/인천/경기 아파트 실거래가 및 네이버 매물 데이터 수집·가공·DB 적재 시스템"
+name = "apt-insight-platform"
+version = "0.2.0"
+description = "아파트 실거래가·매물 데이터 수집, AI 분석 에이전트, 웹 서비스 통합 플랫폼"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
-    "requests>=2.31.0",
-    "pandas>=2.2.0",
-    "xmltodict>=0.14.0",
+    # 공통 (shared)
     "python-dotenv>=1.0.0",
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
+]
+
+[project.optional-dependencies]
+pipeline = [
+    "pandas>=2.2.0",
+    "requests>=2.31.0",
+    "xmltodict>=0.14.0",
     "python-dateutil>=2.9.0",
     "curl-cffi>=0.14.0",
+]
+agent = [
+    "langchain>=1.0.0",
+    "langchain-openai>=0.4.0",
+    "langchain-google-genai>=2.1.0",
+    "langgraph>=1.0.0",
+    "mcp>=1.0.0",
+]
+webapp = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "jinja2>=3.1.0",
+]
+all = [
+    "apt-insight-platform[pipeline,agent,webapp]",
 ]
